@@ -2,6 +2,7 @@ import numpy as np
 import math
 from numpy.random import default_rng
 import matplotlib as plt
+from copy import deepcopy
 
 # need to re-initialize this variable if train a new tree
 count_leaf = 0
@@ -124,7 +125,8 @@ def k_fold_cross_validation(dataset, n_fold, enable_pruning=True):
 
     # split into n fold
     # use 1 fold as testing set, n-1 folds as training set
-    confusion_matrix = np.zeros(shape=(class_number,class_number))
+    hyper = list(range(11))
+    confusion_matrices = [np.zeros(shape=(class_number,class_number)) for _ in hyper]
     for i in range(n_fold):
         training_set = np.zeros(shape=(1,len(dataset[0])))
         testing_set = np.zeros(shape=(1,len(dataset[0])))
@@ -143,34 +145,39 @@ def k_fold_cross_validation(dataset, n_fold, enable_pruning=True):
         testing_set = testing_set[1:]
         # use training set to build tree then pass it for evaluation
         dst = decision_tree_learning(training_set, 0)
+        lis = [deepcopy(dst) for _ in hyper] 
+        if enable_pruning: 
+            for j in range(len(hyper)):
+                p, tre = hyper[j], lis[j]
+                pruning(tre, testing_set, p)
+                ith_fold_confusion_matrix = evaluate(testing_set, tre)
+                confusion_matrices[j] += ith_fold_confusion_matrix
 
-        
-        if enable_pruning: pruning(dst, testing_set)
-        ith_fold_confusion_matrix = evaluate(testing_set, dst)
-        confusion_matrix += ith_fold_confusion_matrix
+    for j in range(len(hyper)):
+        # calculate different metric
+        confusion_matrix = confusion_matrices[j]
+        average_accuracy = np.trace(confusion_matrix) / np.sum(confusion_matrix)
+        precisions = []
+        recalls = []
+        F1_scores = []
+        for i in range(1, class_number+1):
+            TP_i = confusion_matrix[i-1][i-1]
+            TN_i = np.sum(np.delete(np.delete(confusion_matrix, i-1, 0), i-1, 1))
+            FP_i = np.sum(confusion_matrix[:i-1, i-1]) + np.sum(confusion_matrix[i:, i-1])
+            FN_i = np.sum(confusion_matrix[i-1, :i-1]) + np.sum(confusion_matrix[i-1, i:])
+            precision_i = TP_i / (TP_i + FP_i)
+            recall_i = TP_i / (TP_i + FN_i)
+            F1_score_i = 2*precision_i*recall_i / (precision_i + recall_i)
+            precisions.append(precision_i)
+            recalls.append(recall_i)
+            F1_scores.append(F1_score_i)
 
-    # calculate different metric
-    average_accuracy = np.trace(confusion_matrix) / np.sum(confusion_matrix)
-    precisions = []
-    recalls = []
-    F1_scores = []
-    for i in range(1, class_number+1):
-        TP_i = confusion_matrix[i-1][i-1]
-        TN_i = np.sum(np.delete(np.delete(confusion_matrix, i-1, 0), i-1, 1))
-        FP_i = np.sum(confusion_matrix[:i-1, i-1]) + np.sum(confusion_matrix[i:, i-1])
-        FN_i = np.sum(confusion_matrix[i-1, :i-1]) + np.sum(confusion_matrix[i-1, i:])
-        precision_i = TP_i / (TP_i + FP_i)
-        recall_i = TP_i / (TP_i + FN_i)
-        F1_score_i = 2*precision_i*recall_i / (precision_i + recall_i)
-        precisions.append(precision_i)
-        recalls.append(recall_i)
-        F1_scores.append(F1_score_i)
-
-    print("average accuracy: \n", average_accuracy)
-    print("\nconfusion matrix: \n", confusion_matrix)
-    print("\nprecision per class: \n", precisions)
-    print("\nrecall per class: \n", recalls)
-    print("\nF1 score per class: \n", F1_scores)
+        print("\nparameter: \n", hyper[j])
+        print("\naverage accuracy: \n", average_accuracy)
+        print("\nconfusion matrix: \n", confusion_matrix)
+        print("\nprecision per class: \n", precisions)
+        print("\nrecall per class: \n", recalls)
+        print("\nF1 score per class: \n", F1_scores)
 
 
     return (average_accuracy, confusion_matrix, precisions, recalls, F1_scores)
