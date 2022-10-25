@@ -143,6 +143,8 @@ def k_fold_cross_validation(dataset, n_fold, enable_pruning=True):
         testing_set = testing_set[1:]
         # use training set to build tree then pass it for evaluation
         dst = decision_tree_learning(training_set, 0)
+
+        
         if enable_pruning: pruning(dst, testing_set)
         ith_fold_confusion_matrix = evaluate(testing_set, dst)
         confusion_matrix += ith_fold_confusion_matrix
