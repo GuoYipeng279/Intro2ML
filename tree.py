@@ -149,7 +149,7 @@ def k_fold_cross_validation(dataset, n_fold, enable_pruning=True):
         if enable_pruning: 
             for j in range(len(hyper)):
                 p, tre = hyper[j], lis[j]
-                pruning(tre, testing_set, p)
+                pruning(tre, testing_set, np.inf, )
                 ith_fold_confusion_matrix = evaluate(testing_set, tre)
                 confusion_matrices[j] += ith_fold_confusion_matrix
 
@@ -183,7 +183,7 @@ def k_fold_cross_validation(dataset, n_fold, enable_pruning=True):
     return (average_accuracy, confusion_matrix, precisions, recalls, F1_scores)
 
 
-def pruning(tree, validation, prune_limit:int=np.inf):
+def pruning(tree, validation, prune_limit:int=np.inf, threshold:float=0):
     def travel(node):
         if type(node[0]) != dict: return node[0],node[2],0 # return label and composition of the node
         (left_leaf, left_count, left_depth), (right_leaf, right_count, right_depth) = travel(node[0]['left']), travel(node[0]['right'])
@@ -197,7 +197,7 @@ def pruning(tree, validation, prune_limit:int=np.inf):
             if new_count[left_leaf] > new_count[right_leaf]: node[0]['value'] = np.inf
             else: node[0]['value'] = -np.inf
             after = sum(np.diag(evaluate(validation, tree)))
-            if before > after: # dont prune
+            if before+threshold > after: # dont prune
                 node[0]['value'] = rec
                 return None, new_count, np.inf
             else: # prune
