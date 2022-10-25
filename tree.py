@@ -176,14 +176,15 @@ def k_fold_cross_validation(dataset, n_fold, enable_pruning=True):
     return (average_accuracy, confusion_matrix, precisions, recalls, F1_scores)
 
 
-def pruning(tree, validation):
+def pruning(tree, validation, prune_limit:int=np.inf):
     def travel(node):
-        if type(node[0]) != dict: return node[0],node[2] # return label and composition of the node
-        (left_leaf, left_count), (right_leaf, right_count) = travel(node[0]['left']), travel(node[0]['right'])
+        if type(node[0]) != dict: return node[0],node[2],0 # return label and composition of the node
+        (left_leaf, left_count, left_depth), (right_leaf, right_count, right_depth) = travel(node[0]['left']), travel(node[0]['right'])
         if left_leaf: node[0]['left'] = (left_leaf, node[1]+1, left_count)
         if right_leaf: node[0]['right'] = (right_leaf, node[1]+1, right_count)
         new_count = left_count + right_count
-        if left_leaf and right_leaf: # not None means leaf
+        depth = max(left_depth, right_depth)
+        if left_leaf and right_leaf and depth <= prune_limit: # not None means leaf
             before = sum(np.diag(evaluate(validation, tree)))
             rec = node[0]['value']
             if new_count[left_leaf] > new_count[right_leaf]: node[0]['value'] = np.inf
@@ -191,10 +192,10 @@ def pruning(tree, validation):
             after = sum(np.diag(evaluate(validation, tree)))
             if before > after: # dont prune
                 node[0]['value'] = rec
-                return None, new_count
+                return None, new_count, np.inf
             else: # prune
-                return max([left_leaf, right_leaf], key=lambda x: new_count[x]), new_count
-        return None, new_count
+                return max([left_leaf, right_leaf], key=lambda x: new_count[x]), new_count, depth+1
+        return None, new_count, np.inf
     # print(type(tree))
     travel(tree)
 
